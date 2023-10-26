@@ -38,7 +38,11 @@ var LOG_ERROR = 1;
  * This function reads the configuration and changes the power
  * plan accordingly.
  */
-function loop(wmi, shell, wmi_power) {
+function loop(wmi, shell, wmi_power, programExecuteShell) {
+
+	function getUUID(id) {
+		return id.substr(id.indexOf('{') + 1, 36);
+	}
 	/**
 	 * Changes the current power plan on the system if it exists
 	 * and is not currently active
@@ -51,7 +55,7 @@ function loop(wmi, shell, wmi_power) {
 			var p = e2.item();
 			if(p.ElementName.toLowerCase() == plan) {
 				if(!p.IsActive) {
-					p.Activate();
+					programExecuteShell.ShellExecute('powercfg.exe', '/setactive ' + getUUID(p.InstanceID));
 				}
 				break;
 			}
@@ -88,7 +92,6 @@ function loop(wmi, shell, wmi_power) {
 	}
 	try {
 		var processList = config.list;
-		var priority = config.priority;
 		var i = 0;
 		for(; i < processList.length; i++) {
 			if(i > 0) {
@@ -127,10 +130,10 @@ function loop(wmi, shell, wmi_power) {
  * script entry point
  */
 (function() {
+	var programExecuteShell = WScript.CreateObject("Shell.Application");
 	if(!hasArgument('no-elevate')) {
 		WScript.Sleep(5000);
-		var shell = WScript.CreateObject("Shell.Application");
-		shell.ShellExecute("wscript.exe",
+		programExecuteShell.ShellExecute(WScript.FullName,
 			'"' + INSTALL_PATH + WScript.ScriptName
 				+ '" --no-elevate "'
 				+ ARGUMENTS.join('" "')
@@ -138,12 +141,12 @@ function loop(wmi, shell, wmi_power) {
 			"", "runas");
 		return;
 	}
-	// shell, wmi_power and wmi are cached for performance
+	// shell, wmi_power, programExecuteShell and wmi are cached for performance
 	var wmi = GetObject("winmgmts:");
 	var wmi_power = GetObject("winmgmts:\\\\.\\root\\cimv2\\power");
 	var shell = WScript.CreateObject("Wscript.Shell");
 	while(true) {
-		var timeout = loop(wmi, shell, wmi_power);
+		var timeout = loop(wmi, shell, wmi_power, programExecuteShell);
 		WScript.Sleep(timeout * 1000);
 	}
 }());
